@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'badges_screen.dart';
 import 'game_screen.dart';
+import 'update_sheet.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.progress});
@@ -71,6 +72,7 @@ class HomeScreen extends StatelessWidget {
                             ],
                           ),
                         ),
+                        const UpdateButton(),
                         IconButton(
                           tooltip: 'Insignias',
                           icon: const Icon(Icons.military_tech_rounded),
