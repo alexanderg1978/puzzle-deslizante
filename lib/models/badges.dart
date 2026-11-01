@@ -16,6 +16,20 @@ const allBadges = <GameBadge>[
   GameBadge('size_4', 'Jugador 4x4', 'Resuelve un tablero 4x4', '🎯'),
   GameBadge('size_5', 'Jugador 5x5', 'Resuelve un tablero 5x5', '🚀'),
   GameBadge('size_6', 'Jugador 6x6', 'Resuelve un tablero 6x6', '👑'),
+  GameBadge('size_8', 'Gran maestro', 'Resuelve un tablero 8x8', '🧠'),
   GameBadge('speed', 'Rayo', 'Resuelve un 3x3 en menos de 30 s', '⚡'),
-  GameBadge('all_levels', 'Leyenda', 'Completa todos los niveles', '💎'),
+  GameBadge('perfect', 'Perfecto', 'Consigue 3 estrellas en un puzzle', '⭐'),
+  GameBadge('stars_50', 'Coleccionista', 'Reúne 50 estrellas', '🌠'),
+  GameBadge('stars_150', 'Constelación', 'Reúne 150 estrellas', '🌌'),
+  GameBadge('level_25', 'Explorador', 'Completa el nivel 25', '🧭'),
+  GameBadge('level_50', 'Leyenda', 'Completa el nivel 50', '💎'),
+  GameBadge(
+    'challenge',
+    'Desafiante',
+    'Gana un nivel con tope de movimientos '
+        'o sin números',
+    '🥷',
+  ),
+  GameBadge('daily_1', 'Madrugador', 'Completa un reto diario', '☀️'),
+  GameBadge('daily_7', 'Fiel al reto', 'Completa 7 retos diarios', '🗓️'),
 ];

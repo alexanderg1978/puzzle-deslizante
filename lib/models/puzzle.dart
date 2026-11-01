@@ -4,8 +4,8 @@ import 'dart:math';
 /// `tiles[i]` es el número de ficha en la posición i; 0 es el hueco.
 class SlidePuzzle {
   SlidePuzzle(this.size, {Random? random})
-      : _random = random ?? Random(),
-        tiles = List.generate(size * size, (i) => (i + 1) % (size * size)) {
+    : _random = random ?? Random(),
+      tiles = List.generate(size * size, (i) => (i + 1) % (size * size)) {
     shuffle();
   }
 

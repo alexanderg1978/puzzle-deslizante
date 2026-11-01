@@ -4,6 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/badges.dart';
 import '../models/levels.dart';
 
+class WinResult {
+  const WinResult(this.stars, this.newBadges, this.improved);
+  final int stars;
+  final List<GameBadge> newBadges;
+
+  /// true si superó su mejor marca anterior (o es la primera vez).
+  final bool improved;
+}
+
 /// Progreso guardado solo en el teléfono (SharedPreferences), sin servidor.
 /// Cada jugador (cuenta de Google o invitado) tiene su propio espacio.
 class Progress extends ChangeNotifier {
@@ -49,12 +58,20 @@ class Progress extends ChangeNotifier {
 
   String _k(String key) => '$_user/$key';
 
-  // ---- niveles ----
+  // ---- niveles y estrellas ----
   int get unlockedLevel => _prefs.getInt(_k('unlocked')) ?? 1;
   int get totalSolved => _prefs.getInt(_k('solved')) ?? 0;
+  int get totalStars => _prefs.getInt(_k('stars_total')) ?? 0;
+  int starsOf(GameSpec spec) => _prefs.getInt(_k('stars_${spec.key}')) ?? 0;
+  int levelStars(int level) => _prefs.getInt(_k('stars_L$level')) ?? 0;
   int? bestMoves(int level) => _prefs.getInt(_k('best_moves_$level'));
   int? bestSeconds(int level) => _prefs.getInt(_k('best_secs_$level'));
-  bool isCompleted(int level) => bestMoves(level) != null;
+  bool isCompleted(int level) => levelStars(level) > 0;
+
+  // ---- reto diario ----
+  int get dailyCount => _prefs.getInt(_k('daily_count')) ?? 0;
+  bool dailyDone(DateTime d) =>
+      (_prefs.getInt(_k('stars_D${dayKeyOf(d)}')) ?? 0) > 0;
 
   // ---- racha ----
   int get streak {
@@ -77,20 +94,36 @@ class Progress extends ChangeNotifier {
 
   // ---- insignias ----
   Set<String> get badges => (_prefs.getStringList(_k('badges')) ?? []).toSet();
+  int get badgeCount => allBadges.where((b) => badges.contains(b.id)).length;
 
-  /// Registra una victoria y devuelve las insignias nuevas ganadas.
-  Future<List<GameBadge>> recordWin(Level level, int moves, int seconds) async {
-    final prevMoves = bestMoves(level.number);
-    if (prevMoves == null || moves < prevMoves) {
-      await _prefs.setInt(_k('best_moves_${level.number}'), moves);
+  /// Registra una victoria y devuelve estrellas e insignias nuevas.
+  Future<WinResult> recordWin(GameSpec spec, int moves, int seconds) async {
+    final stars = spec.starsFor(moves);
+    final oldStars = starsOf(spec);
+    final improved = stars > oldStars;
+
+    if (improved) {
+      await _prefs.setInt(_k('stars_${spec.key}'), stars);
+      await _prefs.setInt(_k('stars_total'), totalStars + stars - oldStars);
     }
-    final prevSecs = bestSeconds(level.number);
-    if (prevSecs == null || seconds < prevSecs) {
-      await _prefs.setInt(_k('best_secs_${level.number}'), seconds);
+
+    final level = spec.level;
+    if (level != null) {
+      final prevMoves = bestMoves(level);
+      if (prevMoves == null || moves < prevMoves) {
+        await _prefs.setInt(_k('best_moves_$level'), moves);
+      }
+      final prevSecs = bestSeconds(level);
+      if (prevSecs == null || seconds < prevSecs) {
+        await _prefs.setInt(_k('best_secs_$level'), seconds);
+      }
+      if (level >= unlockedLevel) {
+        await _prefs.setInt(_k('unlocked'), level + 1);
+      }
+    } else if (oldStars == 0) {
+      await _prefs.setInt(_k('daily_count'), dailyCount + 1);
     }
-    if (level.number >= unlockedLevel && level.number < levelCount) {
-      await _prefs.setInt(_k('unlocked'), level.number + 1);
-    }
+
     await _prefs.setInt(_k('solved'), totalSolved + 1);
     await _updateStreak();
 
@@ -102,18 +135,30 @@ class Progress extends ChangeNotifier {
       if (streak >= 3) 'streak_3',
       if (streak >= 7) 'streak_7',
       if (streak >= 30) 'streak_30',
-      if (level.size >= 4) 'size_4',
-      if (level.size >= 5) 'size_5',
-      if (level.size >= 6) 'size_6',
-      if (level.size == 3 && seconds < 30) 'speed',
-      if (levels.every((l) => isCompleted(l.number))) 'all_levels',
+      if (spec.size >= 4) 'size_4',
+      if (spec.size >= 5) 'size_5',
+      if (spec.size >= 6) 'size_6',
+      if (spec.size >= 8) 'size_8',
+      if (spec.size == 3 && seconds < 30) 'speed',
+      if (stars == 3) 'perfect',
+      if (totalStars >= 50) 'stars_50',
+      if (totalStars >= 150) 'stars_150',
+      if (level != null && level >= 25) 'level_25',
+      if (level != null && level >= 50) 'level_50',
+      if (spec.modifier != Modifier.none) 'challenge',
+      if (spec.isDaily) 'daily_1',
+      if (dailyCount >= 7) 'daily_7',
     };
     final fresh = earned.difference(owned);
     if (fresh.isNotEmpty) {
       await _prefs.setStringList(_k('badges'), {...owned, ...earned}.toList());
     }
     notifyListeners();
-    return allBadges.where((b) => fresh.contains(b.id)).toList();
+    return WinResult(
+      stars,
+      allBadges.where((b) => fresh.contains(b.id)).toList(),
+      improved,
+    );
   }
 
   Future<void> _updateStreak() async {

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:puzzle_deslizante/models/levels.dart';
 import 'package:puzzle_deslizante/models/puzzle.dart';
 
 bool _solvable(List<int> tiles, int size) {
@@ -35,6 +36,38 @@ void main() {
     expect(p.tiles, [1, 2, 3, 4, 5, 6, 0, 7, 8]);
     expect(p.moves, 1);
     expect(p.tap(1), isFalse); // no comparte fila/columna con el hueco
+  });
+
+  test('los niveles crecen hasta 8x8 y alternan retos', () {
+    expect(levelSpec(1).size, 3);
+    expect(levelSpec(4).size, 3);
+    expect(levelSpec(5).size, 4);
+    expect(levelSpec(17).size, 7);
+    expect(levelSpec(500).size, 8);
+    expect(levelSpec(5).modifier, Modifier.limited);
+    expect(levelSpec(7).modifier, Modifier.blind);
+    expect(levelSpec(35).modifier, Modifier.blind);
+    expect(levelSpec(1).moveLimit, isNull);
+    expect(levelSpec(5).moveLimit, greaterThan(levelSpec(5).par));
+  });
+
+  test('las estrellas dependen de los movimientos', () {
+    final s = levelSpec(1);
+    expect(s.starsFor(s.par), 3);
+    expect(s.starsFor(s.par + 1), 2);
+    expect(s.starsFor((s.par * 1.7).floor()), 2);
+    expect(s.starsFor(s.par * 3), 1);
+  });
+
+  test('el reto diario es igual para la misma fecha', () {
+    final a = dailySpec(DateTime(2026, 11, 2));
+    final b = dailySpec(DateTime(2026, 11, 2, 23, 59));
+    expect(a.dayKey, '20261102');
+    expect(a.size, b.size);
+    expect(a.image.asset, b.image.asset);
+    final p1 = SlidePuzzle(a.size, random: Random(a.seed));
+    final p2 = SlidePuzzle(b.size, random: Random(b.seed));
+    expect(p1.tiles, p2.tiles);
   });
 
   test('detecta puzzle resuelto', () {

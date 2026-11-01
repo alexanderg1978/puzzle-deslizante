@@ -1,28 +1,40 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import '../models/badges.dart';
 import '../models/levels.dart';
 import '../models/puzzle.dart';
 import '../services/progress.dart';
+import '../theme.dart';
+import '../widgets/common.dart';
+import '../widgets/confetti.dart';
+import '../widgets/tile_image.dart';
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.progress, required this.level});
+  const GameScreen({super.key, required this.progress, required this.spec});
   final Progress progress;
-  final Level level;
+  final GameSpec spec;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late Level _level = widget.level;
-  late SlidePuzzle _puzzle = SlidePuzzle(_level.size);
+  late GameSpec _spec = widget.spec;
+  late SlidePuzzle _puzzle = _newPuzzle();
   final _stopwatch = Stopwatch();
   Timer? _ticker;
   bool _showNumbers = true;
-  bool _won = false;
+  bool _over = false;
+
+  bool get _blind => _spec.modifier == Modifier.blind;
+
+  SlidePuzzle _newPuzzle() => SlidePuzzle(
+    _spec.size,
+    random: _spec.seed == null ? null : Random(_spec.seed),
+  );
 
   @override
   void dispose() {
@@ -30,60 +42,64 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
-  void _restart(Level level) {
+  void _start(GameSpec spec) {
     _ticker?.cancel();
     _stopwatch
       ..stop()
       ..reset();
     setState(() {
-      _level = level;
-      _puzzle = SlidePuzzle(level.size);
-      _won = false;
+      _spec = spec;
+      _puzzle = _newPuzzle();
+      _over = false;
     });
   }
 
   Future<void> _onTap(int index) async {
-    if (_won) return;
+    if (_over) return;
     if (!_puzzle.tap(index)) return;
+    HapticFeedback.selectionClick();
     if (!_stopwatch.isRunning) {
       _stopwatch.start();
       _ticker = Timer.periodic(
-          const Duration(seconds: 1), (_) => setState(() {}));
+        const Duration(seconds: 1),
+        (_) => setState(() {}),
+      );
     }
     setState(() {});
+
     if (_puzzle.isSolved) {
-      _won = true;
-      _stopwatch.stop();
-      _ticker?.cancel();
+      _finish();
       final seconds = _stopwatch.elapsed.inSeconds;
-      final fresh =
-          await widget.progress.recordWin(_level, _puzzle.moves, seconds);
-      if (mounted) _showWin(seconds, fresh);
+      final result = await widget.progress.recordWin(
+        _spec,
+        _puzzle.moves,
+        seconds,
+      );
+      HapticFeedback.mediumImpact();
+      if (mounted) _showWin(seconds, result);
+    } else if (_spec.moveLimit != null && _puzzle.moves >= _spec.moveLimit!) {
+      _finish();
+      _showLoss();
     }
   }
 
-  void _showWin(int seconds, List<GameBadge> fresh) {
-    final hasNext = _level.number < levelCount;
+  void _finish() {
+    _over = true;
+    _stopwatch.stop();
+    _ticker?.cancel();
+  }
+
+  String _fmt(int s) =>
+      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+
+  void _showLoss() {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('¡Completado! 🎉'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${_puzzle.moves} movimientos en ${_fmt(seconds)}'),
-            const SizedBox(height: 4),
-            Text('${_level.image.title} — ${_level.image.credit}',
-                style: Theme.of(context).textTheme.bodySmall),
-            if (fresh.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text('Nuevas insignias:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              for (final b in fresh) Text('${b.emoji} ${b.name}'),
-            ],
-          ],
+        title: const Text('Sin movimientos 😵'),
+        content: Text(
+          'Llegaste al tope de ${_spec.moveLimit} movimientos. ¡Inténtalo otra vez!',
         ),
         actions: [
           TextButton(
@@ -91,43 +107,170 @@ class _GameScreenState extends State<GameScreen> {
               Navigator.pop(context);
               Navigator.pop(this.context);
             },
-            child: const Text('Niveles'),
+            child: const Text('Salir'),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
-              _restart(hasNext ? levels[_level.number] : _level);
+              _start(_spec);
             },
-            child: Text(hasNext ? 'Siguiente nivel' : 'Repetir'),
+            child: const Text('Reintentar'),
           ),
         ],
       ),
     );
   }
 
-  String _fmt(int s) =>
-      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+  void _showWin(int seconds, WinResult result) {
+    final next = _spec.level == null ? null : levelSpec(_spec.level! + 1);
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      transitionDuration: const Duration(milliseconds: 250),
+      transitionBuilder: (context, anim, _, child) =>
+          FadeTransition(opacity: anim, child: child),
+      pageBuilder: (context, _, _) => Stack(
+        children: [
+          Center(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                margin: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
+                constraints: const BoxConstraints(maxWidth: 380),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF241A4A),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.white24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kViolet.withValues(alpha: 0.5),
+                      blurRadius: 40,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '¡Completado!',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _AnimatedStars(count: result.stars),
+                    const SizedBox(height: 14),
+                    Text(
+                      '${_puzzle.moves} movimientos · ${_fmt(seconds)}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    if (result.stars < 3)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Con ${_spec.par} movimientos o menos: 3 estrellas',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${_spec.image.title} — ${_spec.image.credit}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (result.newBadges.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Glass(
+                        radius: 16,
+                        tint: kGold.withValues(alpha: 0.18),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Nueva insignia',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            for (final b in result.newBadges)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text('${b.emoji} ${b.name}'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.pop(this.context);
+                            },
+                            child: const Text('Inicio'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              if (next != null) {
+                                _start(next);
+                              } else {
+                                Navigator.pop(this.context);
+                              }
+                            },
+                            child: Text(next != null ? 'Siguiente' : 'Listo'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const Positioned.fill(child: Confetti()),
+        ],
+      ),
+    );
+  }
 
   void _preview() {
     showDialog<void>(
       context: context,
       builder: (context) => Dialog(
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(16),
                 child: AspectRatio(
                   aspectRatio: 1,
-                  child: Image.asset(_level.image.asset, fit: BoxFit.cover),
+                  child: Image.asset(_spec.image.asset, fit: BoxFit.cover),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(_level.image.title,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(_level.image.credit),
+              const SizedBox(height: 10),
+              Text(
+                _spec.image.title,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              Text(
+                _spec.image.credit,
+                style: const TextStyle(color: Colors.white60),
+              ),
             ],
           ),
         ),
@@ -137,58 +280,94 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
+    final numbers = _showNumbers && !_blind;
+    final limit = _spec.moveLimit;
+    return GradientScaffold(
       appBar: AppBar(
-        title: Text('Nivel ${_level.number} · ${_level.label}'),
+        title: Text('${_spec.title} · ${_spec.label}'),
         actions: [
           IconButton(
             tooltip: 'Ver imagen',
-            icon: const Icon(Icons.image_outlined),
+            icon: const Icon(Icons.image_rounded),
             onPressed: _preview,
           ),
-          IconButton(
-            tooltip: 'Mostrar/ocultar números',
-            icon: Icon(_showNumbers ? Icons.pin : Icons.pin_outlined),
-            onPressed: () => setState(() => _showNumbers = !_showNumbers),
-          ),
+          if (!_blind)
+            IconButton(
+              tooltip: 'Mostrar/ocultar números',
+              icon: Icon(_showNumbers ? Icons.pin_rounded : Icons.pin_outlined),
+              onPressed: () => setState(() => _showNumbers = !_showNumbers),
+            ),
           IconButton(
             tooltip: 'Mezclar de nuevo',
-            icon: const Icon(Icons.shuffle),
-            onPressed: () => _restart(_level),
+            icon: const Icon(Icons.shuffle_rounded),
+            onPressed: () => _start(_spec),
           ),
         ],
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
           child: Column(
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _Stat(Icons.touch_app, '${_puzzle.moves}', 'movimientos'),
-                  _Stat(Icons.timer_outlined,
-                      _fmt(_stopwatch.elapsed.inSeconds), 'tiempo'),
+                  Expanded(
+                    child: _Stat(
+                      Icons.touch_app_rounded,
+                      limit == null
+                          ? '${_puzzle.moves}'
+                          : '${_puzzle.moves}/$limit',
+                      'movimientos',
+                      warn: limit != null && _puzzle.moves >= limit * 0.85,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _Stat(
+                      Icons.timer_outlined,
+                      _fmt(_stopwatch.elapsed.inSeconds),
+                      'tiempo',
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
+              if (_spec.modifier != Modifier.none)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    _blind
+                        ? '👁️ Reto: sin números, guíate por la imagen'
+                        : '⏳ Reto: máximo $limit movimientos',
+                    style: const TextStyle(
+                      color: kGold,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               Expanded(
                 child: Center(
                   child: AspectRatio(
                     aspectRatio: 1,
                     child: Container(
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.black.withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: Colors.white24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kViolet.withValues(alpha: 0.35),
+                            blurRadius: 30,
+                            offset: const Offset(0, 14),
+                          ),
+                        ],
                       ),
-                      padding: const EdgeInsets.all(4),
                       child: LayoutBuilder(
                         builder: (context, box) => _Board(
                           puzzle: _puzzle,
-                          asset: _level.image.asset,
+                          asset: _spec.image.asset,
                           boardSide: box.maxWidth,
-                          showNumbers: _showNumbers,
+                          showNumbers: numbers,
                           onTap: _onTap,
                         ),
                       ),
@@ -196,8 +375,10 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 ),
               ),
-              Text('${_level.image.title} · ${_level.image.credit}',
-                  style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                '${_spec.image.title} · ${_spec.image.credit}',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
             ],
           ),
         ),
@@ -206,23 +387,73 @@ class _GameScreenState extends State<GameScreen> {
   }
 }
 
+class _AnimatedStars extends StatelessWidget {
+  const _AnimatedStars({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 0; i < 3; i++)
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: i < count ? 1 : 0.35),
+          duration: Duration(milliseconds: 450 + i * 280),
+          curve: Curves.elasticOut,
+          builder: (_, v, _) => Transform.scale(
+            scale: v,
+            child: Icon(
+              i < count ? Icons.star_rounded : Icons.star_outline_rounded,
+              size: i == 1 ? 68 : 54,
+              color: i < count ? kGold : Colors.white38,
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
 class _Stat extends StatelessWidget {
-  const _Stat(this.icon, this.value, this.label);
+  const _Stat(this.icon, this.value, this.label, {this.warn = false});
   final IconData icon;
   final String value;
   final String label;
+  final bool warn;
 
   @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          Row(children: [
-            Icon(icon, size: 20),
-            const SizedBox(width: 6),
-            Text(value, style: Theme.of(context).textTheme.titleLarge),
-          ]),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-        ],
-      );
+  Widget build(BuildContext context) => Glass(
+    radius: 16,
+    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+    tint: warn ? const Color(0x55FF5252) : null,
+    child: Row(
+      children: [
+        Icon(icon, size: 22, color: kGold),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white60, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _Board extends StatelessWidget {
@@ -243,20 +474,14 @@ class _Board extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = puzzle.size;
-    const gap = 2.0;
     final cell = boardSide / n;
+    final radius = (cell * 0.14).clamp(3.0, 12.0);
     final children = <Widget>[];
 
     for (var pos = 0; pos < puzzle.tiles.length; pos++) {
       final tile = puzzle.tiles[pos];
       if (tile == 0) continue;
-      // Posición correcta de esta ficha en la imagen.
-      final home = tile - 1;
-      final hr = home ~/ n, hc = home % n;
-      final align = Alignment(
-        n == 1 ? 0 : -1 + 2 * hc / (n - 1),
-        n == 1 ? 0 : -1 + 2 * hr / (n - 1),
-      );
+      final home = tile - 1; // posición correcta en la imagen
       children.add(
         AnimatedPositioned(
           key: ValueKey(tile),
@@ -269,39 +494,43 @@ class _Board extends StatelessWidget {
           child: GestureDetector(
             onTap: () => onTap(pos),
             child: Padding(
-              padding: const EdgeInsets.all(gap / 2),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    OverflowBox(
-                      maxWidth: boardSide,
-                      maxHeight: boardSide,
-                      alignment: align,
-                      child: SizedBox(
-                        width: boardSide,
-                        height: boardSide,
-                        child: Image.asset(asset, fit: BoxFit.cover),
+              padding: const EdgeInsets.all(1.5),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(radius),
+                  border: Border.all(color: Colors.white38, width: 1),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(radius),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      TileImage(
+                        asset: asset,
+                        boardSide: boardSide,
+                        n: n,
+                        row: home ~/ n,
+                        col: home % n,
                       ),
-                    ),
-                    if (showNumbers)
-                      Positioned(
-                        left: 4,
-                        top: 2,
-                        child: Text(
-                          '$tile',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: cell * 0.28,
-                            shadows: const [
-                              Shadow(blurRadius: 4, color: Colors.black)
-                            ],
+                      if (showNumbers)
+                        Positioned(
+                          left: 5,
+                          top: 2,
+                          child: Text(
+                            '$tile',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: (cell * 0.28).clamp(9.0, 22.0),
+                              shadows: const [
+                                Shadow(blurRadius: 4, color: Colors.black),
+                                Shadow(blurRadius: 8, color: Colors.black),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
