@@ -6,6 +6,7 @@ import '../services/progress.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'badges_screen.dart';
+import 'extras.dart';
 import 'game_screen.dart';
 import 'update_sheet.dart';
 
@@ -103,6 +104,7 @@ class HomeScreen extends StatelessWidget {
                     onTap: () => _play(context, daily),
                   ),
                 ),
+                SliverToBoxAdapter(child: HomeExtras(progress: progress)),
                 const SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(20, 18, 20, 8),

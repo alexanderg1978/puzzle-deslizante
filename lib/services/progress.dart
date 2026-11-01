@@ -1,16 +1,31 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/badges.dart';
 import '../models/levels.dart';
+import '../models/quests.dart';
 
 class WinResult {
-  const WinResult(this.stars, this.newBadges, this.improved);
+  const WinResult(
+    this.stars,
+    this.newBadges,
+    this.improved,
+    this.gems,
+    this.completedQuests,
+  );
   final int stars;
   final List<GameBadge> newBadges;
 
   /// true si superó su mejor marca anterior (o es la primera vez).
   final bool improved;
+
+  /// Gemas ganadas por la partida (sin contar misiones).
+  final int gems;
+
+  /// Misiones diarias que se completaron con esta victoria.
+  final List<Quest> completedQuests;
 }
 
 /// Progreso guardado solo en el teléfono (SharedPreferences), sin servidor.
@@ -78,9 +93,55 @@ class Progress extends ChangeNotifier {
     final last = _prefs.getString(_k('last_day'));
     if (last == null) return 0;
     final gap = _dayNumber(DateTime.now()) - _dayNumber(DateTime.parse(last));
-    // Si pasó más de un día sin jugar, la racha ya se perdió.
-    return gap > 1 ? 0 : (_prefs.getInt(_k('streak')) ?? 0);
+    // Cada día perdido gasta un congelador; sin ellos la racha se pierde.
+    final missed = gap - 1;
+    return missed > freezes ? 0 : (_prefs.getInt(_k('streak')) ?? 0);
   }
+
+  // ---- gemas, congeladores, cofre ----
+  int get gems => _prefs.getInt(_k('gems')) ?? startingGems;
+  int get freezes => _prefs.getInt(_k('freezes')) ?? 0;
+  bool get chestReady =>
+      _prefs.getString(_k('chest_day')) != dayKeyOf(DateTime.now());
+
+  Future<void> addGems(int n) async {
+    await _prefs.setInt(_k('gems'), gems + n);
+    notifyListeners();
+  }
+
+  /// Gasta [n] gemas; devuelve false si no alcanzan.
+  Future<bool> spendGems(int n) async {
+    if (gems < n) return false;
+    await _prefs.setInt(_k('gems'), gems - n);
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> buyFreeze() async {
+    if (freezes >= maxFreezes || !await spendGems(freezeCost)) return false;
+    await _prefs.setInt(_k('freezes'), freezes + 1);
+    notifyListeners();
+    return true;
+  }
+
+  /// Abre el cofre diario: 10 a 30 gemas más un extra por racha (máx. +10).
+  /// Devuelve las gemas ganadas o null si ya se abrió hoy.
+  Future<int?> openChest() async {
+    if (!chestReady) return null;
+    final reward = 10 + Random().nextInt(21) + streak.clamp(0, 10);
+    await _prefs.setString(_k('chest_day'), dayKeyOf(DateTime.now()));
+    await addGems(reward);
+    return reward;
+  }
+
+  // ---- misiones diarias ----
+  String get _today => dayKeyOf(DateTime.now());
+  int questProgress(Quest q) => _prefs.getInt(_k('q_${_today}_${q.id}')) ?? 0;
+  bool questDone(Quest q) => questProgress(q) >= q.target;
+
+  // ---- galería ----
+  Set<String> get gallery =>
+      (_prefs.getStringList(_k('gallery')) ?? []).toSet();
 
   int get bestStreak => _prefs.getInt(_k('best_streak')) ?? 0;
   bool get playedToday {
@@ -127,6 +188,37 @@ class Progress extends ChangeNotifier {
     await _prefs.setInt(_k('solved'), totalSolved + 1);
     await _updateStreak();
 
+    // Gemas: recompensa completa la primera vez, por estrellas mejoradas
+    // después, y 1 por repetir.
+    final gemsEarned = oldStars == 0
+        ? 5 + 3 * stars
+        : improved
+        ? 3 * (stars - oldStars)
+        : 1;
+    var questGems = 0;
+    final doneQuests = <Quest>[];
+    for (final q in dailyQuests) {
+      if (questDone(q)) continue;
+      final add = switch (q.id) {
+        'solve' => 1,
+        'stars' => stars,
+        'daily' => spec.isDaily ? 1 : 0,
+        _ => 0,
+      };
+      if (add == 0) continue;
+      await _prefs.setInt(_k('q_${_today}_${q.id}'), questProgress(q) + add);
+      if (questDone(q)) {
+        doneQuests.add(q);
+        questGems += q.reward;
+      }
+    }
+    await addGems(gemsEarned + questGems);
+
+    final shown = gallery;
+    if (!shown.contains(spec.image.asset)) {
+      await _prefs.setStringList(_k('gallery'), [...shown, spec.image.asset]);
+    }
+
     final owned = badges;
     final earned = <String>{
       'first_win',
@@ -158,6 +250,8 @@ class Progress extends ChangeNotifier {
       stars,
       allBadges.where((b) => fresh.contains(b.id)).toList(),
       improved,
+      gemsEarned,
+      doneQuests,
     );
   }
 
@@ -170,10 +264,17 @@ class Progress extends ChangeNotifier {
       current = 1;
     } else {
       final gap = today - _dayNumber(DateTime.parse(last));
+      final missed = gap - 1;
       if (gap == 1) {
         current += 1;
       } else if (gap > 1) {
-        current = 1;
+        if (missed <= freezes) {
+          // Los congeladores cubren los días perdidos y la racha sigue.
+          await _prefs.setInt(_k('freezes'), freezes - missed);
+          current += 1;
+        } else {
+          current = 1;
+        }
       } // gap == 0: ya contó hoy
     }
     await _prefs.setInt(_k('streak'), current);

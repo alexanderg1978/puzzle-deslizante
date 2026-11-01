@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puzzle_deslizante/main.dart';
 import 'package:puzzle_deslizante/services/progress.dart';
+import 'package:puzzle_deslizante/services/update_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -9,6 +10,7 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
+    UpdateService.autoCheck = false;
     tester.view.physicalSize = const Size(1080, 2280);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -20,12 +22,17 @@ void main() {
     await tester.tap(find.text('Jugar sin registrarme'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Reto diario'), findsOneWidget);
+    expect(find.text('Cofre diario'), findsOneWidget);
+    expect(find.text('Misiones de hoy'), findsOneWidget);
     expect(find.text('Niveles'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('3x3').first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('3x3').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('Nivel 1'), findsOneWidget);
     expect(find.text('movimientos'), findsOneWidget);
+    expect(find.textContaining('Pista'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

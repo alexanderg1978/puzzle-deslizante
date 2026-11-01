@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../models/levels.dart';
 import '../models/puzzle.dart';
+import '../models/quests.dart';
 import '../services/progress.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -28,6 +29,7 @@ class _GameScreenState extends State<GameScreen> {
   Timer? _ticker;
   bool _showNumbers = true;
   bool _over = false;
+  (int target, int from)? _hint;
 
   bool get _blind => _spec.modifier == Modifier.blind;
 
@@ -51,12 +53,45 @@ class _GameScreenState extends State<GameScreen> {
       _spec = spec;
       _puzzle = _newPuzzle();
       _over = false;
+      _hint = null;
     });
+  }
+
+  void _toast(String text) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(text),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  Future<void> _useHint() async {
+    if (_over || _puzzle.hint() == null) return;
+    if (!await widget.progress.spendGems(hintCost)) {
+      _toast('Necesitas $hintCost 💎 para una pista');
+      return;
+    }
+    setState(() => _hint = _puzzle.hint());
+  }
+
+  Future<void> _undo() async {
+    if (_over || !_puzzle.canUndo) return;
+    if (!await widget.progress.spendGems(undoCost)) {
+      _toast('Necesitas $undoCost 💎 para deshacer');
+      return;
+    }
+    _puzzle.undo();
+    setState(() => _hint = null);
   }
 
   Future<void> _onTap(int index) async {
     if (_over) return;
     if (!_puzzle.tap(index)) return;
+    _hint = null;
     HapticFeedback.selectionClick();
     if (!_stopwatch.isRunning) {
       _stopwatch.start();
@@ -167,6 +202,21 @@ class _GameScreenState extends State<GameScreen> {
                       '${_puzzle.moves} movimientos · ${_fmt(seconds)}',
                       style: const TextStyle(fontSize: 16),
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '+${result.gems} 💎',
+                      style: const TextStyle(
+                        color: kGold,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    for (final q in result.completedQuests)
+                      Text(
+                        'Misión: ${q.title} · +${q.reward} 💎',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12.5),
+                      ),
                     if (result.stars < 3)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -369,9 +419,57 @@ class _GameScreenState extends State<GameScreen> {
                           boardSide: box.maxWidth,
                           showNumbers: numbers,
                           onTap: _onTap,
+                          hint: _hint,
                         ),
                       ),
                     ),
+                  ),
+                ),
+              ),
+              ListenableBuilder(
+                listenable: widget.progress,
+                builder: (context, _) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _ActionButton(
+                          icon: Icons.lightbulb_rounded,
+                          label: 'Pista',
+                          cost: hintCost,
+                          enabled: !_over && widget.progress.gems >= hintCost,
+                          onTap: _useHint,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Glass(
+                        radius: 16,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 14,
+                        ),
+                        child: Text(
+                          '💎 ${widget.progress.gems}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _ActionButton(
+                          icon: Icons.undo_rounded,
+                          label: 'Deshacer',
+                          cost: undoCost,
+                          enabled:
+                              !_over &&
+                              _puzzle.canUndo &&
+                              widget.progress.gems >= undoCost,
+                          onTap: _undo,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -456,6 +554,48 @@ class _Stat extends StatelessWidget {
   );
 }
 
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.cost,
+    required this.enabled,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final int cost;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: enabled ? 1 : 0.4,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Glass(
+        radius: 16,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20, color: kGold),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                '$label · 💎$cost',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _Board extends StatelessWidget {
   const _Board({
     required this.puzzle,
@@ -463,6 +603,7 @@ class _Board extends StatelessWidget {
     required this.boardSide,
     required this.showNumbers,
     required this.onTap,
+    this.hint,
   });
 
   final SlidePuzzle puzzle;
@@ -471,12 +612,40 @@ class _Board extends StatelessWidget {
   final bool showNumbers;
   final ValueChanged<int> onTap;
 
+  /// (casilla destino, posición actual de la ficha) si hay una pista activa.
+  final (int target, int from)? hint;
+
   @override
   Widget build(BuildContext context) {
     final n = puzzle.size;
     final cell = boardSide / n;
     final radius = (cell * 0.14).clamp(3.0, 12.0);
     final children = <Widget>[];
+
+    final h = hint;
+    if (h != null) {
+      // Marca la casilla a la que debe ir la ficha señalada.
+      children.add(
+        Positioned(
+          left: (h.$1 % n) * cell,
+          top: (h.$1 ~/ n) * cell,
+          width: cell,
+          height: cell,
+          child: IgnorePointer(
+            child: Padding(
+              padding: const EdgeInsets.all(1.5),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: kGold.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(radius),
+                  border: Border.all(color: kGold, width: 2),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     for (var pos = 0; pos < puzzle.tiles.length; pos++) {
       final tile = puzzle.tiles[pos];
@@ -498,7 +667,10 @@ class _Board extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(radius),
-                  border: Border.all(color: Colors.white38, width: 1),
+                  border: Border.all(
+                    color: pos == h?.$2 ? kGold : Colors.white38,
+                    width: pos == h?.$2 ? 3 : 1,
+                  ),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(radius),

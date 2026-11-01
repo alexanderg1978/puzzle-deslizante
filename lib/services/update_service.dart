@@ -25,6 +25,9 @@ class AppVersion {
 class UpdateService {
   static const repo = 'alexanderg1978/puzzle-deslizante';
 
+  /// Comprobación automática al abrir la app (los tests la desactivan).
+  static bool autoCheck = true;
+
   static Future<AppVersion> currentVersion() async {
     final info = await PackageInfo.fromPlatform();
     return AppVersion(info.version, int.tryParse(info.buildNumber) ?? 0);
@@ -34,7 +37,8 @@ class UpdateService {
   /// Lanza una excepción si no hay conexión o GitHub no responde.
   static Future<UpdateInfo?> check() async {
     final current = await currentVersion();
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
     try {
       final request = await client.getUrl(
         Uri.parse('https://api.github.com/repos/$repo/releases?per_page=1'),
@@ -42,7 +46,9 @@ class UpdateService {
       request.headers
         ..set('Accept', 'application/vnd.github+json')
         ..set('User-Agent', 'puzzle-deslizante');
-      final response = await request.close().timeout(const Duration(seconds: 15));
+      final response = await request.close().timeout(
+        const Duration(seconds: 15),
+      );
       if (response.statusCode != 200) {
         throw HttpException('GitHub respondió ${response.statusCode}');
       }
@@ -73,7 +79,7 @@ class UpdateService {
 
   /// Descarga el APK y abre el instalador de Android.
   static Stream<OtaEvent> install(UpdateInfo update) => OtaUpdate().execute(
-        update.url,
-        destinationFilename: 'puzzle-deslizante.apk',
-      );
+    update.url,
+    destinationFilename: 'puzzle-deslizante.apk',
+  );
 }

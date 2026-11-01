@@ -13,6 +13,26 @@ class SlidePuzzle {
   final Random _random;
   final List<int> tiles;
   int moves = 0;
+  final List<List<int>> _history = [];
+
+  bool get canUndo => _history.isNotEmpty;
+
+  /// Revierte el último movimiento (los movimientos contados no bajan).
+  bool undo() {
+    if (_history.isEmpty) return false;
+    tiles.setAll(0, _history.removeLast());
+    return true;
+  }
+
+  /// Pista: la primera casilla (en orden de lectura) que no tiene su ficha,
+  /// con la posición actual de la ficha que le corresponde.
+  /// Devuelve (casilla destino, posición actual de la ficha) o null.
+  (int target, int from)? hint() {
+    for (var p = 0; p < tiles.length - 1; p++) {
+      if (tiles[p] != p + 1) return (p, tiles.indexOf(p + 1));
+    }
+    return null;
+  }
 
   int get emptyIndex => tiles.indexOf(0);
 
@@ -62,6 +82,9 @@ class SlidePuzzle {
     final r = index ~/ size, c = index % size;
     final er = empty ~/ size, ec = empty % size;
     if (index == empty || (r != er && c != ec)) return false;
+
+    _history.add(List.of(tiles));
+    if (_history.length > 300) _history.removeAt(0);
 
     final step = r == er ? (c < ec ? 1 : -1) : (r < er ? size : -size);
     var cursor = empty;

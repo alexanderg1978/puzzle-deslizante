@@ -21,29 +21,32 @@ class _UpdateButtonState extends State<UpdateButton> {
   @override
   void initState() {
     super.initState();
-    UpdateService.check().then((u) {
-      if (mounted) setState(() => _available = u);
-    }).catchError((_) {
-      // Sin conexión: se avisa solo si el usuario abre el panel.
-    });
+    if (!UpdateService.autoCheck) return;
+    UpdateService.check()
+        .then((u) {
+          if (mounted) setState(() => _available = u);
+        })
+        .catchError((_) {
+          // Sin conexión: se avisa solo si el usuario abre el panel.
+        });
   }
 
   @override
   Widget build(BuildContext context) => IconButton(
-        tooltip: 'Actualizaciones',
-        icon: Badge(
-          isLabelVisible: _available != null,
-          child: const Icon(Icons.system_update_rounded),
-        ),
-        onPressed: () => showModalBottomSheet<void>(
-          context: context,
-          backgroundColor: const Color(0xFF241A4A),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          builder: (_) => _UpdateSheet(initial: _available),
-        ),
-      );
+    tooltip: 'Actualizaciones',
+    icon: Badge(
+      isLabelVisible: _available != null,
+      child: const Icon(Icons.system_update_rounded),
+    ),
+    onPressed: () => showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF241A4A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => _UpdateSheet(initial: _available),
+    ),
+  );
 }
 
 enum _Phase { checking, upToDate, available, downloading, installing, error }
@@ -83,7 +86,9 @@ class _UpdateSheetState extends State<_UpdateSheet> {
       _current = await UpdateService.currentVersion();
       _update = await UpdateService.check();
       if (!mounted) return;
-      setState(() => _phase = _update == null ? _Phase.upToDate : _Phase.available);
+      setState(
+        () => _phase = _update == null ? _Phase.upToDate : _Phase.available,
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -111,10 +116,12 @@ class _UpdateSheetState extends State<_UpdateSheet> {
               _phase = _Phase.installing;
             case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
               _phase = _Phase.error;
-              _error = 'Permite instalar apps de esta fuente y vuelve a intentarlo.';
+              _error =
+                  'Permite instalar apps de esta fuente y vuelve a intentarlo.';
             default:
               _phase = _Phase.error;
-              _error = 'Falló la descarga o instalación (${event.status.name}).';
+              _error =
+                  'Falló la descarga o instalación (${event.status.name}).';
           }
         });
       },
@@ -136,13 +143,17 @@ class _UpdateSheetState extends State<_UpdateSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Actualizaciones',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const Text(
+              'Actualizaciones',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
             if (_current != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('Versión instalada: ${_current!} (build ${_current!.build})',
-                    style: const TextStyle(color: Colors.white60, fontSize: 12.5)),
+                child: Text(
+                  'Versión instalada: ${_current!} (build ${_current!.build})',
+                  style: const TextStyle(color: Colors.white60, fontSize: 12.5),
+                ),
               ),
             const SizedBox(height: 20),
             ..._body(),
@@ -153,61 +164,64 @@ class _UpdateSheetState extends State<_UpdateSheet> {
   }
 
   List<Widget> _body() => switch (_phase) {
-        _Phase.checking => const [
-            CircularProgressIndicator(),
-            SizedBox(height: 12),
-            Text('Buscando…'),
-          ],
-        _Phase.upToDate => [
-            const Text('✅', style: TextStyle(fontSize: 40)),
-            const SizedBox(height: 8),
-            const Text('Ya tienes la última versión'),
-            const SizedBox(height: 16),
-            OutlinedButton(onPressed: _check, child: const Text('Buscar de nuevo')),
-          ],
-        _Phase.available => [
-            const Text('🚀', style: TextStyle(fontSize: 40)),
-            const SizedBox(height: 8),
-            Text('Nueva versión ${_update!.name}',
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            if (_update!.notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(_update!.notes,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            ],
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _install,
-              icon: const Icon(Icons.download_rounded),
-              label: const Text('Descargar e instalar'),
-              style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50)),
-            ),
-          ],
-        _Phase.downloading => [
-            LinearProgressIndicator(
-              value: _progress == 0 ? null : _progress / 100,
-              minHeight: 10,
-              borderRadius: BorderRadius.circular(8),
-              color: kGold,
-            ),
-            const SizedBox(height: 12),
-            Text('Descargando… $_progress%'),
-          ],
-        _Phase.installing => const [
-            Text('📦', style: TextStyle(fontSize: 40)),
-            SizedBox(height: 8),
-            Text('Abriendo el instalador de Android…'),
-          ],
-        _Phase.error => [
-            const Text('⚠️', style: TextStyle(fontSize: 40)),
-            const SizedBox(height: 8),
-            Text(_error, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            OutlinedButton(onPressed: _check, child: const Text('Reintentar')),
-          ],
-      };
+    _Phase.checking => const [
+      CircularProgressIndicator(),
+      SizedBox(height: 12),
+      Text('Buscando…'),
+    ],
+    _Phase.upToDate => [
+      const Text('✅', style: TextStyle(fontSize: 40)),
+      const SizedBox(height: 8),
+      const Text('Ya tienes la última versión'),
+      const SizedBox(height: 16),
+      OutlinedButton(onPressed: _check, child: const Text('Buscar de nuevo')),
+    ],
+    _Phase.available => [
+      const Text('🚀', style: TextStyle(fontSize: 40)),
+      const SizedBox(height: 8),
+      Text(
+        'Nueva versión ${_update!.name}',
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+      ),
+      if (_update!.notes.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text(
+          _update!.notes,
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+      ],
+      const SizedBox(height: 16),
+      FilledButton.icon(
+        onPressed: _install,
+        icon: const Icon(Icons.download_rounded),
+        label: const Text('Descargar e instalar'),
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+      ),
+    ],
+    _Phase.downloading => [
+      LinearProgressIndicator(
+        value: _progress == 0 ? null : _progress / 100,
+        minHeight: 10,
+        borderRadius: BorderRadius.circular(8),
+        color: kGold,
+      ),
+      const SizedBox(height: 12),
+      Text('Descargando… $_progress%'),
+    ],
+    _Phase.installing => const [
+      Text('📦', style: TextStyle(fontSize: 40)),
+      SizedBox(height: 8),
+      Text('Abriendo el instalador de Android…'),
+    ],
+    _Phase.error => [
+      const Text('⚠️', style: TextStyle(fontSize: 40)),
+      const SizedBox(height: 8),
+      Text(_error, textAlign: TextAlign.center),
+      const SizedBox(height: 16),
+      OutlinedButton(onPressed: _check, child: const Text('Reintentar')),
+    ],
+  };
 }
