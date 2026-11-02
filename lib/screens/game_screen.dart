@@ -31,8 +31,6 @@ class _GameScreenState extends State<GameScreen> {
   bool _over = false;
   (int target, int from)? _hint;
 
-  bool get _blind => _spec.modifier == Modifier.blind;
-
   SlidePuzzle _newPuzzle() => SlidePuzzle(
     _spec.size,
     random: _spec.seed == null ? null : Random(_spec.seed),
@@ -330,7 +328,7 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final numbers = _showNumbers && !_blind;
+    final numbers = _showNumbers && _spec.hasNumbers;
     final limit = _spec.moveLimit;
     return GradientScaffold(
       appBar: AppBar(
@@ -341,7 +339,7 @@ class _GameScreenState extends State<GameScreen> {
             icon: const Icon(Icons.image_rounded),
             onPressed: _preview,
           ),
-          if (!_blind)
+          if (_spec.hasNumbers)
             IconButton(
               tooltip: 'Mostrar/ocultar números',
               icon: Icon(_showNumbers ? Icons.pin_rounded : Icons.pin_outlined),
@@ -385,9 +383,7 @@ class _GameScreenState extends State<GameScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Text(
-                    _blind
-                        ? '👁️ Reto: sin números, guíate por la imagen'
-                        : '⏳ Reto: máximo $limit movimientos',
+                    '⏳ Reto: máximo $limit movimientos',
                     style: const TextStyle(
                       color: kGold,
                       fontWeight: FontWeight.w700,

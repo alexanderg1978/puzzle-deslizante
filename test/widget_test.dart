@@ -40,13 +40,14 @@ void main() {
 
   test('los niveles crecen hasta 8x8 y alternan retos', () {
     expect(levelSpec(1).size, 3);
-    expect(levelSpec(4).size, 3);
-    expect(levelSpec(5).size, 4);
-    expect(levelSpec(17).size, 7);
+    expect(levelSpec(3).size, 3);
+    expect(levelSpec(4).size, 4);
+    expect(levelSpec(13).size, 7);
     expect(levelSpec(500).size, 8);
     expect(levelSpec(5).modifier, Modifier.limited);
-    expect(levelSpec(7).modifier, Modifier.blind);
-    expect(levelSpec(35).modifier, Modifier.blind);
+    expect(levelSpec(7).modifier, Modifier.none);
+    expect(levelSpec(1).hasNumbers, isTrue);
+    expect(levelSpec(2).hasNumbers, isFalse);
     expect(levelSpec(1).moveLimit, isNull);
     expect(levelSpec(5).moveLimit, greaterThan(levelSpec(5).par));
   });

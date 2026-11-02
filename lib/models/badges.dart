@@ -26,8 +26,7 @@ const allBadges = <GameBadge>[
   GameBadge(
     'challenge',
     'Desafiante',
-    'Gana un nivel con tope de movimientos '
-        'o sin números',
+    'Gana un nivel con tope de movimientos',
     '🥷',
   ),
   GameBadge('daily_1', 'Madrugador', 'Completa un reto diario', '☀️'),

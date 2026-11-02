@@ -40,6 +40,27 @@ const images = <PuzzleImage>[
     'La Gioconda',
     'Leonardo da Vinci, c. 1503',
   ),
+  PuzzleImage(
+    'assets/images/amanecer_tierra.jpg',
+    'Amanecer de la Tierra',
+    'NASA, Apolo 8, 1968',
+  ),
+  PuzzleImage(
+    'assets/images/saturno.jpg',
+    'Saturno',
+    'NASA/JPL, Cassini, 2008',
+  ),
+  PuzzleImage(
+    'assets/images/libertad.jpg',
+    'La libertad guiando al pueblo',
+    'Eugène Delacroix, 1830',
+  ),
+  PuzzleImage(
+    'assets/images/caminante.jpg',
+    'El caminante sobre el mar de nubes',
+    'Caspar David Friedrich, c. 1818',
+  ),
+  PuzzleImage('assets/images/grito.jpg', 'El grito', 'Edvard Munch, 1893'),
 ];
 
 enum Modifier {
@@ -47,9 +68,6 @@ enum Modifier {
 
   /// Tope de movimientos: si te pasas, pierdes el intento.
   limited,
-
-  /// Sin números en las fichas: solo la imagen.
-  blind,
 }
 
 /// Todo lo necesario para jugar una partida: un nivel o el reto diario.
@@ -77,6 +95,9 @@ class GameSpec {
   final String? dayKey;
 
   bool get isDaily => dayKey != null;
+
+  /// Solo el primer nivel enseña los números; el resto se juega con la imagen.
+  bool get hasNumbers => level == 1;
   int get tileCount => size * size - 1;
   String get label => '${size}x$size';
 
@@ -97,15 +118,11 @@ class GameSpec {
 
 const maxBoardSize = 8;
 
-/// Niveles infinitos: el tablero crece cada 4 niveles hasta 8x8; cada 5º
-/// nivel tiene tope de movimientos y cada 7º va sin números.
+/// Niveles infinitos: el tablero crece cada 3 niveles hasta 8x8 y cada 5º
+/// nivel tiene tope de movimientos. Solo el nivel 1 muestra números.
 GameSpec levelSpec(int n) {
-  final size = min(3 + (n - 1) ~/ 4, maxBoardSize);
-  final modifier = n % 7 == 0
-      ? Modifier.blind
-      : n % 5 == 0
-      ? Modifier.limited
-      : Modifier.none;
+  final size = min(3 + (n - 1) ~/ 3, maxBoardSize);
+  final modifier = n % 5 == 0 ? Modifier.limited : Modifier.none;
   return GameSpec(
     title: 'Nivel $n',
     size: size,

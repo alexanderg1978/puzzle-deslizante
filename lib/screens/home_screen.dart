@@ -334,7 +334,6 @@ class _LevelTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final icon = switch (spec.modifier) {
       Modifier.limited => '⏳',
-      Modifier.blind => '👁️',
       Modifier.none => '',
     };
     Widget photo = Image.asset(
