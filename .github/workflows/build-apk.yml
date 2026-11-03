@@ -71,3 +71,15 @@ jobs:
             --target "${{ github.sha }}" \
             --title "Preview $TAG" \
             --notes "$COMMIT_MESSAGE"
+
+      # Solo se conservan los 2 últimos previews y artefactos para ahorrar espacio.
+      - name: Limpiar previews y artefactos antiguos
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --limit 100 --json tagName --jq '.[2:][].tagName' |
+            while read -r tag; do gh release delete "$tag" --cleanup-tag --yes; done
+          gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts | sort_by(.created_at) | reverse | .[2:][].id' |
+            while read -r id; do gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id"; done
