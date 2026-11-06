@@ -17,4 +17,7 @@ const hintCost = 5;
 const undoCost = 2;
 const freezeCost = 30;
 const maxFreezes = 2;
+
+/// Gemas extra la primera vez que se vence a un jefe contrarreloj.
+const bossBonus = 25;
 const startingGems = 20;

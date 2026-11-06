@@ -51,6 +51,17 @@ void main() {
     expect(fourth.completedQuests, isEmpty);
   });
 
+  test('vencer un jefe da bono la primera vez y la insignia', () async {
+    SharedPreferences.setMockInitialValues({});
+    final progress = await Progress.load();
+    final boss = levelSpec(10);
+    final first = await progress.recordWin(boss, boss.par, 20);
+    expect(first.gems, 5 + 3 * 3 + bossBonus);
+    expect(first.newBadges.map((b) => b.id), contains('boss'));
+    final again = await progress.recordWin(boss, boss.par, 20);
+    expect(again.gems, 1);
+  });
+
   test(
     'cofre diario se abre una vez al día y la tienda limita congeladores',
     () async {

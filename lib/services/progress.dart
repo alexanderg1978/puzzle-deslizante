@@ -190,11 +190,14 @@ class Progress extends ChangeNotifier {
 
     // Gemas: recompensa completa la primera vez, por estrellas mejoradas
     // después, y 1 por repetir.
-    final gemsEarned = oldStars == 0
-        ? 5 + 3 * stars
-        : improved
-        ? 3 * (stars - oldStars)
-        : 1;
+    // Vencer a un jefe (contrarreloj) por primera vez da un bono extra.
+    final gemsEarned =
+        (oldStars == 0
+            ? 5 + 3 * stars
+            : improved
+            ? 3 * (stars - oldStars)
+            : 1) +
+        (oldStars == 0 && spec.modifier == Modifier.timed ? bossBonus : 0);
     var questGems = 0;
     final doneQuests = <Quest>[];
     for (final q in dailyQuests) {
@@ -238,6 +241,7 @@ class Progress extends ChangeNotifier {
       if (level != null && level >= 25) 'level_25',
       if (level != null && level >= 50) 'level_50',
       if (spec.modifier != Modifier.none) 'challenge',
+      if (spec.modifier == Modifier.timed) 'boss',
       if (spec.isDaily) 'daily_1',
       if (dailyCount >= 7) 'daily_7',
     };
