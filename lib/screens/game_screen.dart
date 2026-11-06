@@ -29,6 +29,8 @@ class _GameScreenState extends State<GameScreen> {
   Timer? _ticker;
   bool _showNumbers = true;
   bool _over = false;
+  bool _peek = false;
+  Timer? _peekTimer;
   (int target, int from)? _hint;
 
   SlidePuzzle _newPuzzle() => SlidePuzzle(
@@ -39,6 +41,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _peekTimer?.cancel();
     super.dispose();
   }
 
@@ -52,6 +55,7 @@ class _GameScreenState extends State<GameScreen> {
       _puzzle = _newPuzzle();
       _over = false;
       _hint = null;
+      _peek = false;
     });
   }
 
@@ -73,7 +77,15 @@ class _GameScreenState extends State<GameScreen> {
       _toast('Necesitas $hintCost 💎 para una pista');
       return;
     }
-    setState(() => _hint = _puzzle.hint());
+    // La pista enseña un instante la imagen completa y marca la ficha a mover.
+    _peekTimer?.cancel();
+    setState(() {
+      _hint = _puzzle.hint();
+      _peek = true;
+    });
+    _peekTimer = Timer(const Duration(milliseconds: 2200), () {
+      if (mounted) setState(() => _peek = false);
+    });
   }
 
   Future<void> _undo() async {
@@ -428,13 +440,32 @@ class _GameScreenState extends State<GameScreen> {
                         ],
                       ),
                       child: LayoutBuilder(
-                        builder: (context, box) => _Board(
-                          puzzle: _puzzle,
-                          asset: _spec.image.asset,
-                          boardSide: box.maxWidth,
-                          showNumbers: numbers,
-                          onTap: _onTap,
-                          hint: _hint,
+                        builder: (context, box) => Stack(
+                          children: [
+                            _Board(
+                              puzzle: _puzzle,
+                              asset: _spec.image.asset,
+                              boardSide: box.maxWidth,
+                              showNumbers: numbers,
+                              onTap: _onTap,
+                              hint: _hint,
+                            ),
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: AnimatedOpacity(
+                                  opacity: _peek ? 1 : 0,
+                                  duration: const Duration(milliseconds: 250),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Image.asset(
+                                      _spec.image.asset,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
