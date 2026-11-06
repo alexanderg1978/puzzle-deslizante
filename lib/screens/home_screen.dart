@@ -100,6 +100,13 @@ class HomeScreen extends StatelessWidget {
                 ),
                 SliverToBoxAdapter(child: _Stats(progress: progress)),
                 SliverToBoxAdapter(
+                  child: _ContinueButton(
+                    spec: levelSpec(progress.unlockedLevel),
+                    onTap: () =>
+                        _play(context, levelSpec(progress.unlockedLevel)),
+                  ),
+                ),
+                SliverToBoxAdapter(
                   child: _DailyCard(
                     spec: daily,
                     stars: progress.starsOf(daily),
@@ -222,6 +229,34 @@ class _Chip extends StatelessWidget {
             style: const TextStyle(color: Colors.white60, fontSize: 11),
           ),
         ],
+      ),
+    ),
+  );
+}
+
+/// Acceso directo al nivel que toca jugar, sin buscarlo en la lista.
+class _ContinueButton extends StatelessWidget {
+  const _ContinueButton({required this.spec, required this.onTap});
+  final GameSpec spec;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+    child: FilledButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.play_arrow_rounded, size: 30),
+      label: Text(
+        spec.level == 1
+            ? 'Jugar · Nivel 1'
+            : 'Continuar · Nivel ${spec.level} (${spec.label})',
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(60),
+        backgroundColor: kGold,
+        foregroundColor: Colors.black,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       ),
     ),
   );
