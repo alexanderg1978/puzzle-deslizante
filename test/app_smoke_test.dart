@@ -24,9 +24,8 @@ void main() {
     expect(find.textContaining('Reto diario'), findsOneWidget);
     expect(find.text('Cofre diario'), findsOneWidget);
     expect(find.text('Misiones de hoy'), findsOneWidget);
-    expect(find.text('Niveles'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('3x3').first);
+    expect(find.textContaining('Mundo 1'), findsOneWidget);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
     await tester.pumpAndSettle();
     await tester.tap(find.text('3x3').first);
     await tester.pumpAndSettle();

@@ -93,10 +93,17 @@ class _GameScreenState extends State<GameScreen> {
     HapticFeedback.selectionClick();
     if (!_stopwatch.isRunning) {
       _stopwatch.start();
-      _ticker = Timer.periodic(
-        const Duration(seconds: 1),
-        (_) => setState(() {}),
-      );
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        final limit = _spec.timeLimit;
+        if (limit != null && _stopwatch.elapsed.inSeconds >= limit && !_over) {
+          _finish();
+          HapticFeedback.heavyImpact();
+          setState(() {});
+          _showLoss(timeUp: true);
+          return;
+        }
+        setState(() {});
+      });
     }
     setState(() {});
 
@@ -125,14 +132,16 @@ class _GameScreenState extends State<GameScreen> {
   String _fmt(int s) =>
       '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
 
-  void _showLoss() {
+  void _showLoss({bool timeUp = false}) {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Sin movimientos 😵'),
+        title: Text(timeUp ? 'Se acabó el tiempo ⏱️' : 'Sin movimientos 😵'),
         content: Text(
-          'Llegaste al tope de ${_spec.moveLimit} movimientos. ¡Inténtalo otra vez!',
+          timeUp
+              ? 'No lo lograste en ${_fmt(_spec.timeLimit!)}. ¡Inténtalo otra vez!'
+              : 'Llegaste al tope de ${_spec.moveLimit} movimientos. ¡Inténtalo otra vez!',
         ),
         actions: [
           TextButton(
@@ -330,6 +339,7 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     final numbers = _showNumbers && _spec.hasNumbers;
     final limit = _spec.moveLimit;
+    final timeLimit = _spec.timeLimit;
     return GradientScaffold(
       appBar: AppBar(
         title: Text('${_spec.title} · ${_spec.label}'),
@@ -373,8 +383,15 @@ class _GameScreenState extends State<GameScreen> {
                   Expanded(
                     child: _Stat(
                       Icons.timer_outlined,
-                      _fmt(_stopwatch.elapsed.inSeconds),
-                      'tiempo',
+                      _fmt(
+                        timeLimit == null
+                            ? _stopwatch.elapsed.inSeconds
+                            : max(0, timeLimit - _stopwatch.elapsed.inSeconds),
+                      ),
+                      timeLimit == null ? 'tiempo' : 'tiempo restante',
+                      warn:
+                          timeLimit != null &&
+                          timeLimit - _stopwatch.elapsed.inSeconds <= 10,
                     ),
                   ),
                 ],
@@ -383,7 +400,9 @@ class _GameScreenState extends State<GameScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Text(
-                    '⏳ Reto: máximo $limit movimientos',
+                    timeLimit != null
+                        ? '⏱️ Jefe: resuélvelo en ${_fmt(timeLimit)}'
+                        : '⏳ Reto: máximo $limit movimientos',
                     style: const TextStyle(
                       color: kGold,
                       fontWeight: FontWeight.w700,

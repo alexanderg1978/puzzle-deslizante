@@ -68,6 +68,41 @@ enum Modifier {
 
   /// Tope de movimientos: si te pasas, pierdes el intento.
   limited,
+
+  /// Cuenta atrás: si se acaba el tiempo, pierdes el intento (niveles jefe).
+  timed,
+}
+
+/// Cada 10 niveles empieza un mundo nuevo; el último nivel de cada uno es un
+/// jefe contrarreloj.
+const levelsPerWorld = 10;
+
+class World {
+  const World(this.name, this.emoji);
+  final String name;
+  final String emoji;
+}
+
+const worlds = <World>[
+  World('Pradera', '🌱'),
+  World('Bosque', '🌲'),
+  World('Desierto', '🏜️'),
+  World('Océano', '🌊'),
+  World('Montaña', '🏔️'),
+  World('Volcán', '🌋'),
+  World('Ciudad neón', '🌃'),
+  World('Espacio', '🚀'),
+  World('Galaxia', '🌌'),
+];
+
+/// Índice (desde 0) del mundo al que pertenece el nivel [n].
+int worldIndexOf(int n) => (n - 1) ~/ levelsPerWorld;
+
+/// Más allá del último mundo se repiten con un número de vuelta (II, III…).
+String worldName(int index) {
+  final base = worlds[index % worlds.length];
+  final lap = index ~/ worlds.length + 1;
+  return '${base.emoji} ${base.name}${lap > 1 ? ' $lap' : ''}';
 }
 
 /// Todo lo necesario para jugar una partida: un nivel o el reto diario.
@@ -106,6 +141,10 @@ class GameSpec {
   int? get moveLimit =>
       modifier == Modifier.limited ? (par * 2.2).round() : null;
 
+  /// Segundos disponibles en los niveles jefe.
+  int? get timeLimit =>
+      modifier == Modifier.timed ? 30 + tileCount * 5 : null;
+
   int starsFor(int moves) => moves <= par
       ? 3
       : moves <= par * 1.7
@@ -119,10 +158,15 @@ class GameSpec {
 const maxBoardSize = 8;
 
 /// Niveles infinitos: el tablero crece cada 3 niveles hasta 8x8 y cada 5º
-/// nivel tiene tope de movimientos. Solo el nivel 1 muestra números.
+/// nivel tiene tope de movimientos y cada 10º (jefe) es contrarreloj. Solo el
+/// nivel 1 muestra números.
 GameSpec levelSpec(int n) {
   final size = min(3 + (n - 1) ~/ 3, maxBoardSize);
-  final modifier = n % 5 == 0 ? Modifier.limited : Modifier.none;
+  final modifier = n % levelsPerWorld == 0
+      ? Modifier.timed
+      : n % 5 == 0
+      ? Modifier.limited
+      : Modifier.none;
   return GameSpec(
     title: 'Nivel $n',
     size: size,

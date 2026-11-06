@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../models/levels.dart';
@@ -105,41 +107,44 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 SliverToBoxAdapter(child: HomeExtras(progress: progress)),
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
-                    child: Text(
-                      'Niveles',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                for (var w = 0; w * levelsPerWorld < count; w++) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                      child: Text(
+                        'Mundo ${w + 1} · ${worldName(w)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  sliver: SliverGrid.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.78,
-                        ),
-                    itemCount: count,
-                    itemBuilder: (context, i) {
-                      final spec = levelSpec(i + 1);
-                      final unlocked = spec.level! <= progress.unlockedLevel;
-                      return _LevelTile(
-                        spec: spec,
-                        unlocked: unlocked,
-                        stars: progress.levelStars(spec.level!),
-                        onTap: unlocked ? () => _play(context, spec) : null,
-                      );
-                    },
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    sliver: SliverGrid.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 0.78,
+                          ),
+                      itemCount: min(levelsPerWorld, count - w * levelsPerWorld),
+                      itemBuilder: (context, i) {
+                        final spec = levelSpec(w * levelsPerWorld + i + 1);
+                        final unlocked = spec.level! <= progress.unlockedLevel;
+                        return _LevelTile(
+                          spec: spec,
+                          unlocked: unlocked,
+                          stars: progress.levelStars(spec.level!),
+                          onTap: unlocked ? () => _play(context, spec) : null,
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
               ],
             ),
           ),
@@ -334,6 +339,7 @@ class _LevelTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final icon = switch (spec.modifier) {
       Modifier.limited => '⏳',
+      Modifier.timed => '⏱️',
       Modifier.none => '',
     };
     Widget photo = Image.asset(

@@ -46,6 +46,12 @@ void main() {
     expect(levelSpec(500).size, 8);
     expect(levelSpec(5).modifier, Modifier.limited);
     expect(levelSpec(7).modifier, Modifier.none);
+    expect(levelSpec(10).modifier, Modifier.timed);
+    expect(levelSpec(10).timeLimit, greaterThan(0));
+    expect(levelSpec(5).timeLimit, isNull);
+    expect(worldIndexOf(10), 0);
+    expect(worldIndexOf(11), 1);
+    expect(worldName(9), contains('2'));
     expect(levelSpec(1).hasNumbers, isTrue);
     expect(levelSpec(2).hasNumbers, isFalse);
     expect(levelSpec(1).moveLimit, isNull);
