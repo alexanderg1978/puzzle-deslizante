@@ -306,7 +306,7 @@ class GalleryScreen extends StatelessWidget {
     final unlocked = progress.gallery;
     return GradientScaffold(
       appBar: AppBar(
-        title: Text('Galería ${unlocked.length}/${images.length}'),
+        title: Text('Galería ${unlocked.length}/${imagePool.length}'),
       ),
       body: SafeArea(
         child: GridView.builder(
@@ -317,9 +317,9 @@ class GalleryScreen extends StatelessWidget {
             crossAxisSpacing: 14,
             childAspectRatio: 0.82,
           ),
-          itemCount: images.length,
+          itemCount: imagePool.length,
           itemBuilder: (context, i) {
-            final image = images[i];
+            final image = imagePool[i];
             final has = unlocked.contains(image.asset);
             return GestureDetector(
               onTap: has ? () => _show(context, image) : null,
@@ -332,9 +332,7 @@ class GalleryScreen extends StatelessWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(14),
                         child: has
-                            ? Image.asset(
-                                image.asset,
-                                fit: BoxFit.cover,
+                            ? image.view(
                                 width: double.infinity,
                                 cacheWidth: 400,
                               )
@@ -389,7 +387,7 @@ class GalleryScreen extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.asset(image.asset, fit: BoxFit.contain),
+              child: image.view(fit: BoxFit.contain),
             ),
             const SizedBox(height: 10),
             Text(

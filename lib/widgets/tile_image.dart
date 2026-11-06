@@ -5,14 +5,14 @@ import 'package:flutter/material.dart';
 class TileImage extends StatelessWidget {
   const TileImage({
     super.key,
-    required this.asset,
+    required this.image,
     required this.boardSide,
     required this.n,
     required this.row,
     required this.col,
   });
 
-  final String asset;
+  final ImageProvider image;
   final double boardSide;
   final int n;
   final int row;
@@ -31,7 +31,7 @@ class TileImage extends StatelessWidget {
       child: SizedBox(
         width: boardSide,
         height: boardSide,
-        child: Image.asset(asset, fit: BoxFit.cover),
+        child: Image(image: image, fit: BoxFit.cover),
       ),
     );
   }

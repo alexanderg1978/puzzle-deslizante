@@ -1,12 +1,35 @@
+import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/widgets.dart';
+
 class PuzzleImage {
-  const PuzzleImage(this.asset, this.title, this.credit);
+  const PuzzleImage(this.asset, this.title, this.credit, {this.filePath});
+
+  /// Ruta del asset incluido en la app, o `remote/<id>` si viene del catálogo
+  /// descargado (sirve además como clave en la galería).
   final String asset;
   final String title;
   final String credit;
+
+  /// Archivo local de una imagen del catálogo ya descargada.
+  final String? filePath;
+
+  ImageProvider get provider =>
+      filePath != null ? FileImage(File(filePath!)) : AssetImage(asset);
+
+  /// Imagen lista para mostrar; [cacheWidth] reduce la memoria en miniaturas.
+  Image view({BoxFit fit = BoxFit.cover, double? width, int? cacheWidth}) =>
+      Image(
+        image: cacheWidth == null
+            ? provider
+            : ResizeImage(provider, width: cacheWidth),
+        fit: fit,
+        width: width,
+      );
 }
 
+/// Imágenes que vienen dentro de la app (siempre disponibles, sin conexión).
 /// Obras de dominio público (Wikimedia Commons / NASA).
 const images = <PuzzleImage>[
   PuzzleImage(
@@ -62,6 +85,10 @@ const images = <PuzzleImage>[
   ),
   PuzzleImage('assets/images/grito.jpg', 'El grito', 'Edvard Munch, 1893'),
 ];
+
+/// Imágenes disponibles para los niveles: las incluidas más las del catálogo
+/// que ya se descargaron (las añade CatalogService).
+List<PuzzleImage> imagePool = images;
 
 enum Modifier {
   none,
@@ -170,7 +197,7 @@ GameSpec levelSpec(int n) {
   return GameSpec(
     title: 'Nivel $n',
     size: size,
-    image: images[(n - 1) % images.length],
+    image: imagePool[(n - 1) % imagePool.length],
     modifier: modifier,
     level: n,
   );
@@ -186,7 +213,7 @@ GameSpec dailySpec(DateTime d) {
   return GameSpec(
     title: 'Reto diario',
     size: 3 + seed % 4,
-    image: images[seed % images.length],
+    image: imagePool[seed % imagePool.length],
     seed: seed,
     dayKey: key,
   );

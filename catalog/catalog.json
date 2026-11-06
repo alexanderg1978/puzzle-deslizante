@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "images": [
+    {
+      "id": "met-435702",
+      "title": "La feria de caballos",
+      "credit": "Rosa Bonheur, 1852–55 · The Met (CC0)",
+      "file": "images/met-435702.jpg"
+    },
+    {
+      "id": "met-436545",
+      "title": "Manuel Osorio Manrique de Zúñiga",
+      "credit": "Francisco de Goya, c. 1787 · The Met (CC0)",
+      "file": "images/met-436545.jpg"
+    },
+    {
+      "id": "met-436323",
+      "title": "Dama con su perrito",
+      "credit": "Jean-Honoré Fragonard, c. 1769 · The Met (CC0)",
+      "file": "images/met-436323.jpg"
+    },
+    {
+      "id": "met-438815",
+      "title": "Madame Charpentier y sus hijos",
+      "credit": "Auguste Renoir, 1878 · The Met (CC0)",
+      "file": "images/met-438815.jpg"
+    },
+    {
+      "id": "met-438820",
+      "title": "Las señoritas de la aldea",
+      "credit": "Gustave Courbet, 1851–52 · The Met (CC0)",
+      "file": "images/met-438820.jpg"
+    }
+  ]
+}

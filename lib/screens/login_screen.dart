@@ -201,7 +201,7 @@ class _LogoState extends State<_Logo> with SingleTickerProviderStateMixin {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: TileImage(
-                      asset: images[0].asset,
+                      image: images[0].provider,
                       boardSide: side,
                       n: n,
                       row: i ~/ n,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/levels.dart';
 import '../services/auth.dart';
+import '../services/catalog.dart';
 import '../services/progress.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -26,7 +27,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: progress,
+      listenable: Listenable.merge([progress, CatalogService.instance]),
       builder: (context, _) {
         final name = progress.playerName ?? 'Invitado';
         final today = DateTime.now();
@@ -335,11 +336,7 @@ class _DailyCard extends StatelessWidget {
                   ),
                   child: SizedBox(
                     width: 104,
-                    child: Image.asset(
-                      spec.image.asset,
-                      fit: BoxFit.cover,
-                      cacheWidth: 300,
-                    ),
+                    child: spec.image.view(cacheWidth: 300),
                   ),
                 ),
               ],
@@ -377,11 +374,7 @@ class _LevelTile extends StatelessWidget {
       Modifier.timed => '⏱️',
       Modifier.none => '',
     };
-    Widget photo = Image.asset(
-      spec.image.asset,
-      fit: BoxFit.cover,
-      cacheWidth: 300,
-    );
+    Widget photo = spec.image.view(cacheWidth: 300);
     if (!unlocked) photo = ColorFiltered(colorFilter: _gray, child: photo);
 
     return GestureDetector(

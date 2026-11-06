@@ -328,7 +328,7 @@ class _GameScreenState extends State<GameScreen> {
                 borderRadius: BorderRadius.circular(16),
                 child: AspectRatio(
                   aspectRatio: 1,
-                  child: Image.asset(_spec.image.asset, fit: BoxFit.cover),
+                  child: _spec.image.view(),
                 ),
               ),
               const SizedBox(height: 10),
@@ -444,7 +444,7 @@ class _GameScreenState extends State<GameScreen> {
                           children: [
                             _Board(
                               puzzle: _puzzle,
-                              asset: _spec.image.asset,
+                              image: _spec.image.provider,
                               boardSide: box.maxWidth,
                               showNumbers: numbers,
                               onTap: _onTap,
@@ -457,10 +457,7 @@ class _GameScreenState extends State<GameScreen> {
                                   duration: const Duration(milliseconds: 250),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(16),
-                                    child: Image.asset(
-                                      _spec.image.asset,
-                                      fit: BoxFit.cover,
-                                    ),
+                                    child: _spec.image.view(),
                                   ),
                                 ),
                               ),
@@ -645,7 +642,7 @@ class _ActionButton extends StatelessWidget {
 class _Board extends StatelessWidget {
   const _Board({
     required this.puzzle,
-    required this.asset,
+    required this.image,
     required this.boardSide,
     required this.showNumbers,
     required this.onTap,
@@ -653,7 +650,7 @@ class _Board extends StatelessWidget {
   });
 
   final SlidePuzzle puzzle;
-  final String asset;
+  final ImageProvider image;
   final double boardSide;
   final bool showNumbers;
   final ValueChanged<int> onTap;
@@ -724,7 +721,7 @@ class _Board extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       TileImage(
-                        asset: asset,
+                        image: image,
                         boardSide: boardSide,
                         n: n,
                         row: home ~/ n,

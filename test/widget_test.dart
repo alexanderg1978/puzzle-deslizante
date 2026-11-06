@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:flutter/widgets.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puzzle_deslizante/models/levels.dart';
 import 'package:puzzle_deslizante/models/puzzle.dart';
@@ -82,5 +84,15 @@ void main() {
     p.tiles.setAll(0, [1, 2, 3, 4, 5, 6, 7, 0, 8]);
     p.tap(8);
     expect(p.isSolved, isTrue);
+  });
+
+  test('las imágenes del catálogo descargadas entran en los niveles', () {
+    final remote = PuzzleImage('remote/x', 'T', 'C', filePath: '/tmp/x.jpg');
+    expect(remote.provider, isA<FileImage>());
+    expect(images.first.provider, isA<AssetImage>());
+    imagePool = [...images, remote];
+    addTearDown(() => imagePool = images);
+    expect(levelSpec(images.length + 1).image.asset, 'remote/x');
+    expect(levelSpec(1).image.asset, images.first.asset);
   });
 }
