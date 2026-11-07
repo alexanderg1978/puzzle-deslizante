@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/levels.dart';
+import '../models/praise.dart';
 import '../models/puzzle.dart';
 import '../models/quests.dart';
 import '../services/progress.dart';
@@ -144,6 +145,16 @@ class _GameScreenState extends State<GameScreen> {
   String _fmt(int s) =>
       '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
 
+  /// Fichas que aún no están en su sitio (para el mensaje de "casi").
+  int _misplaced() {
+    var n = 0;
+    final t = _puzzle.tiles;
+    for (var i = 0; i < t.length; i++) {
+      if (t[i] != 0 && t[i] != i + 1) n++;
+    }
+    return n;
+  }
+
   void _showLoss({bool timeUp = false}) {
     showDialog<void>(
       context: context,
@@ -151,9 +162,9 @@ class _GameScreenState extends State<GameScreen> {
       builder: (context) => AlertDialog(
         title: Text(timeUp ? 'Se acabó el tiempo ⏱️' : 'Sin movimientos 😵'),
         content: Text(
-          timeUp
-              ? 'No lo lograste en ${_fmt(_spec.timeLimit!)}. ¡Inténtalo otra vez!'
-              : 'Llegaste al tope de ${_spec.moveLimit} movimientos. ¡Inténtalo otra vez!',
+          '${nearMissLine(_misplaced())}\n'
+          '${timeUp ? 'Tenías ${_fmt(_spec.timeLimit!)}.' : 'El tope era de ${_spec.moveLimit} movimientos.'}'
+          ' ¡Inténtalo otra vez!',
         ),
         actions: [
           TextButton(
@@ -207,29 +218,79 @@ class _GameScreenState extends State<GameScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      '¡Completado!',
-                      style: TextStyle(
-                        fontSize: 26,
+                    Text(
+                      praiseTitle(_spec, result.stars, _puzzle.moves),
+                      style: const TextStyle(
+                        color: kGold,
+                        fontSize: 34,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     _AnimatedStars(count: result.stars),
                     const SizedBox(height: 14),
-                    Text(
-                      '${_puzzle.moves} movimientos · ${_fmt(seconds)}',
-                      style: const TextStyle(fontSize: 16),
+                    Row(
+                      children: [
+                        _StatBox('Tiempo', _fmt(seconds)),
+                        const SizedBox(width: 8),
+                        _StatBox('Movim.', '${_puzzle.moves}'),
+                        const SizedBox(width: 8),
+                        _StatBox(
+                          'Ingenio',
+                          '${result.ingenuity}',
+                          badge: result.bestIngenuity ? '★' : null,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
+                    if (result.combo >= comboMinimum)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          '🔥 Combo x${result.combo}'
+                          '${result.comboBonus > 0 ? ' · +${result.comboBonus} 💎' : ''}',
+                          style: const TextStyle(
+                            color: Colors.orangeAccent,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
                     Text(
-                      '+${result.gems} 💎',
+                      praiseLine(
+                        _spec,
+                        stars: result.stars,
+                        moves: _puzzle.moves,
+                        seconds: seconds,
+                        record: result.record,
+                        combo: result.combo,
+                      ),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: kGold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '+${result.gems} 💎'
+                      '${result.doubled ? '  (primera victoria del día ×2)' : ''}',
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: kGold,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (result.chestGems > 0)
+                      Text(
+                        '🎁 Cofre de hito: +${result.chestGems} 💎 incluidas',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    if (_spec.level != null) ...[
+                      const SizedBox(height: 14),
+                      _MilestoneBar(level: _spec.level!),
+                    ],
                     for (final q in result.completedQuests)
                       Text(
                         'Misión: ${q.title} · +${q.reward} 💎',
@@ -299,7 +360,12 @@ class _GameScreenState extends State<GameScreen> {
                                 Navigator.pop(this.context);
                               }
                             },
-                            child: Text(next != null ? 'Siguiente' : 'Listo'),
+                            child: Text(
+                              next != null
+                                  ? 'Nivel ${next.level} · ${next.label}\n${difficultyName(next)}'
+                                  : 'Listo',
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
                       ],
@@ -524,6 +590,77 @@ class _GameScreenState extends State<GameScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _StatBox extends StatelessWidget {
+  const _StatBox(this.label, this.value, {this.badge});
+  final String label;
+  final String value;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$value${badge != null ? ' $badge' : ''}',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Barra de 5 tramos hacia el siguiente cofre de hito.
+class _MilestoneBar extends StatelessWidget {
+  const _MilestoneBar({required this.level});
+  final int level;
+
+  @override
+  Widget build(BuildContext context) {
+    final opened = level % milestoneEvery == 0;
+    final filled = opened ? milestoneEvery : level % milestoneEvery;
+    final target = (level + milestoneEvery - 1) ~/ milestoneEvery * milestoneEvery;
+    return Column(
+      children: [
+        Row(
+          children: [
+            for (var i = 0; i < milestoneEvery; i++)
+              Expanded(
+                child: Container(
+                  height: 10,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: i < filled ? kGold : Colors.white12,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+              ),
+            const SizedBox(width: 6),
+            const Text('🎁', style: TextStyle(fontSize: 20)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          opened ? '¡Cofre de hito abierto!' : 'Alcanza el nivel $target',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+      ],
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/badges.dart';
 import '../models/levels.dart';
+import '../models/praise.dart';
 import '../models/quests.dart';
 
 class WinResult {
@@ -13,9 +14,33 @@ class WinResult {
     this.newBadges,
     this.improved,
     this.gems,
-    this.completedQuests,
-  );
+    this.completedQuests, {
+    this.record = false,
+    this.ingenuity = 0,
+    this.bestIngenuity = false,
+    this.combo = 0,
+    this.comboBonus = 0,
+    this.doubled = false,
+    this.chestGems = 0,
+  });
   final int stars;
+
+  /// Mejoró su mejor marca de movimientos en este nivel (no la primera vez).
+  final bool record;
+
+  /// Puntuación de ingenio de la partida y si es la mejor hasta ahora.
+  final int ingenuity;
+  final bool bestIngenuity;
+
+  /// Victorias perfectas seguidas (incluida esta) y gemas extra que dio.
+  final int combo;
+  final int comboBonus;
+
+  /// Primera victoria del día: las gemas se duplican.
+  final bool doubled;
+
+  /// Gemas del cofre de hito (0 si este nivel no lo daba).
+  final int chestGems;
   final List<GameBadge> newBadges;
 
   /// true si superó su mejor marca anterior (o es la primera vez).
@@ -143,6 +168,11 @@ class Progress extends ChangeNotifier {
   Set<String> get gallery =>
       (_prefs.getStringList(_k('gallery')) ?? []).toSet();
 
+  /// Niveles seguidos ganados con 3 estrellas.
+  int get combo => _prefs.getInt(_k('combo')) ?? 0;
+  int get bestCombo => _prefs.getInt(_k('best_combo')) ?? 0;
+  int get bestIngenuity => _prefs.getInt(_k('best_ingenuity')) ?? 0;
+
   int get bestStreak => _prefs.getInt(_k('best_streak')) ?? 0;
   bool get playedToday {
     final last = _prefs.getString(_k('last_day'));
@@ -169,8 +199,10 @@ class Progress extends ChangeNotifier {
     }
 
     final level = spec.level;
+    var record = false;
     if (level != null) {
       final prevMoves = bestMoves(level);
+      record = prevMoves != null && moves < prevMoves;
       if (prevMoves == null || moves < prevMoves) {
         await _prefs.setInt(_k('best_moves_$level'), moves);
       }
@@ -186,18 +218,41 @@ class Progress extends ChangeNotifier {
     }
 
     await _prefs.setInt(_k('solved'), totalSolved + 1);
+    // La primera victoria del día duplica las gemas.
+    final doubled = !playedToday;
     await _updateStreak();
+
+    // Combo: niveles seguidos con 3 estrellas. El bono solo se cobra si la
+    // partida da recompensa (no se puede abusar rejugando).
+    final newCombo = stars == 3 ? combo + 1 : 0;
+    await _prefs.setInt(_k('combo'), newCombo);
+    if (newCombo > bestCombo) await _prefs.setInt(_k('best_combo'), newCombo);
+    final rewarded = oldStars == 0 || improved;
+    final comboBonus = rewarded ? comboBonusFor(newCombo) : 0;
+
+    // Ingenio: se guarda el mejor.
+    final ingenuity = ingenuityOf(spec, moves);
+    final bestIngenuityNow = ingenuity > bestIngenuity;
+    if (bestIngenuityNow) await _prefs.setInt(_k('best_ingenuity'), ingenuity);
+
+    // Cofre de hito cada [milestoneEvery] niveles, solo la primera vez.
+    final chestGems =
+        level != null && oldStars == 0 && level % milestoneEvery == 0
+        ? milestoneReward(level)
+        : 0;
 
     // Gemas: recompensa completa la primera vez, por estrellas mejoradas
     // después, y 1 por repetir.
     // Vencer a un jefe (contrarreloj) por primera vez da un bono extra.
-    final gemsEarned =
+    final baseGems =
         (oldStars == 0
             ? 5 + 3 * stars
             : improved
             ? 3 * (stars - oldStars)
             : 1) +
-        (oldStars == 0 && spec.modifier == Modifier.timed ? bossBonus : 0);
+        (oldStars == 0 && spec.modifier == Modifier.timed ? bossBonus : 0) +
+        comboBonus;
+    final gemsEarned = baseGems * (doubled ? 2 : 1) + chestGems;
     var questGems = 0;
     final doneQuests = <Quest>[];
     for (final q in dailyQuests) {
@@ -256,6 +311,13 @@ class Progress extends ChangeNotifier {
       improved,
       gemsEarned,
       doneQuests,
+      record: record,
+      ingenuity: ingenuity,
+      bestIngenuity: bestIngenuityNow,
+      combo: newCombo,
+      comboBonus: comboBonus,
+      doubled: doubled,
+      chestGems: chestGems,
     );
   }
 
