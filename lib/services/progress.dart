@@ -22,6 +22,7 @@ class WinResult {
     this.comboBonus = 0,
     this.doubled = false,
     this.chestGems = 0,
+    this.newImage = false,
   });
   final int stars;
 
@@ -41,6 +42,9 @@ class WinResult {
 
   /// Gemas del cofre de hito (0 si este nivel no lo daba).
   final int chestGems;
+
+  /// La obra se añadió a la galería con esta victoria.
+  final bool newImage;
   final List<GameBadge> newBadges;
 
   /// true si superó su mejor marca anterior (o es la primera vez).
@@ -273,7 +277,8 @@ class Progress extends ChangeNotifier {
     await addGems(gemsEarned + questGems);
 
     final shown = gallery;
-    if (!shown.contains(spec.image.asset)) {
+    final newImage = !shown.contains(spec.image.asset);
+    if (newImage) {
       await _prefs.setStringList(_k('gallery'), [...shown, spec.image.asset]);
     }
 
@@ -318,6 +323,7 @@ class Progress extends ChangeNotifier {
       comboBonus: comboBonus,
       doubled: doubled,
       chestGems: chestGems,
+      newImage: newImage,
     );
   }
 

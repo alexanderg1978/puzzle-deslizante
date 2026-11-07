@@ -215,7 +215,8 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   ],
                 ),
-                child: Column(
+                child: SingleChildScrollView(
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
@@ -308,12 +309,37 @@ class _GameScreenState extends State<GameScreen> {
                           ),
                         ),
                       ),
+                    const SizedBox(height: 14),
+                    // La obra completa como recompensa visual.
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(
+                        height: 110,
+                        width: 110,
+                        child: _spec.image.view(cacheWidth: 300),
+                      ),
+                    ),
                     const SizedBox(height: 6),
+                    if (result.newImage)
+                      const Text(
+                        '✨ ¡Nueva obra en tu galería!',
+                        style: TextStyle(
+                          color: kGold,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     Text(
                       '${_spec.image.title} — ${_spec.image.credit}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      'Colección ${widget.progress.gallery.length}/${imagePool.length}',
+                      style: const TextStyle(
+                        color: Colors.white70,
                         fontSize: 12,
                       ),
                     ),
@@ -371,6 +397,7 @@ class _GameScreenState extends State<GameScreen> {
                       ],
                     ),
                   ],
+                ),
                 ),
               ),
             ),
