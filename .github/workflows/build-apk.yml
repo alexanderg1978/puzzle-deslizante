@@ -31,6 +31,8 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
+      # Los builds manuales (workflow_dispatch) son APK de prueba: firmados con
+      # la misma clave, así que se instalan encima de la app sin perder datos.
       - name: Restaurar clave de firma
         if: github.event_name != 'pull_request'
         env:
@@ -43,9 +45,10 @@ jobs:
           KEYSTORE_PATH: ${{ runner.temp }}/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          BUILD_NAME: 1.0.${{ github.run_number }}${{ github.event_name == 'workflow_dispatch' && '-prueba' || '' }}
         run: >
           flutter build apk --release
-          --build-name=1.0.${{ github.run_number }}
+          --build-name="$BUILD_NAME"
           --build-number=${{ github.run_number }}
 
       - name: Compilar APK (PR, sin firma de release)
@@ -73,13 +76,33 @@ jobs:
             --title "Preview $TAG" \
             --notes "$COMMIT_MESSAGE"
 
-      # Solo se conservan los 2 últimos previews y artefactos para ahorrar espacio.
-      - name: Limpiar previews y artefactos antiguos
-        if: github.event_name == 'push'
+      # Un build manual publica el APK con tag prueba-N. La app solo busca
+      # tags v1.0.N, así que no se ofrece como actualización a nadie: se
+      # instala a mano desde el enlace del release.
+      - name: Publicar APK de prueba
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          TAG="prueba-${{ github.run_number }}"
+          cp build/app/outputs/flutter-apk/app-release.apk puzzle-deslizante-prueba.apk
+          gh release create "$TAG" puzzle-deslizante-prueba.apk \
+            --prerelease \
+            --target "${{ github.sha }}" \
+            --title "Prueba $TAG ($BRANCH)" \
+            --notes "APK de prueba de la rama $BRANCH. No se distribuye por actualización automática."
+
+      # Se conservan los 2 últimos previews, el último APK de prueba y los 2
+      # últimos artefactos para ahorrar espacio.
+      - name: Limpiar releases y artefactos antiguos
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release list --limit 100 --json tagName --jq '.[2:][].tagName' |
+          gh release list --limit 100 --json tagName --jq '
+            ([.[] | select(.tagName | startswith("v"))][2:] +
+             [.[] | select(.tagName | startswith("prueba-"))][1:])[].tagName' |
             while read -r tag; do gh release delete "$tag" --cleanup-tag --yes; done
           gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
             --jq '.artifacts | sort_by(.created_at) | reverse | .[2:][].id' |

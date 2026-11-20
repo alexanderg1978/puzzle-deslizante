@@ -41,7 +41,7 @@ class UpdateService {
       ..connectionTimeout = const Duration(seconds: 10);
     try {
       final request = await client.getUrl(
-        Uri.parse('https://api.github.com/repos/$repo/releases?per_page=1'),
+        Uri.parse('https://api.github.com/repos/$repo/releases?per_page=10'),
       );
       request.headers
         ..set('Accept', 'application/vnd.github+json')
@@ -54,11 +54,12 @@ class UpdateService {
       }
       final body = await response.transform(utf8.decoder).join();
       final releases = jsonDecode(body) as List<dynamic>;
-      if (releases.isEmpty) return null;
-
-      final release = releases.first as Map<String, dynamic>;
+      // Solo cuentan los previews (v1.0.N); los APK de prueba (prueba-N) se
+      // instalan a mano y no deben ofrecerse como actualización.
+      final release = latestPreview(releases);
+      if (release == null) return null;
       final tag = release['tag_name'] as String;
-      final build = int.tryParse(tag.split('.').last) ?? 0;
+      final build = int.parse(tag.split('.').last);
       if (build <= current.build) return null;
 
       final assets = (release['assets'] as List<dynamic>)
@@ -75,6 +76,16 @@ class UpdateService {
     } finally {
       client.close();
     }
+  }
+
+  /// El preview más reciente de la lista de releases de GitHub (que llega
+  /// ordenada del más nuevo al más viejo), o null si no hay ninguno.
+  static Map<String, dynamic>? latestPreview(List<dynamic> releases) {
+    final preview = RegExp(r'^v\d+\.\d+\.\d+$');
+    for (final release in releases.cast<Map<String, dynamic>>()) {
+      if (preview.hasMatch(release['tag_name'] as String)) return release;
+    }
+    return null;
   }
 
   /// Descarga el APK y abre el instalador de Android.

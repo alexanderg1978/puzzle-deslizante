@@ -16,6 +16,11 @@ compilación y la publicación ocurren en la nube: no se depende de ningún PC.
    firmado, lo publica como pre-release `v1.0.N` (N = número de ejecución) y la
    app instalada lo detecta y se actualiza sola (OTA). Tarda unos 6 minutos.
 
+Para probar una rama en el teléfono sin publicarla: lanzar el workflow a mano
+(`workflow_dispatch`) sobre esa rama. Publica un APK firmado con tag
+`prueba-N`, que se instala encima de la app desde el enlace del release y que
+la actualización automática ignora. Solo se conserva el último.
+
 Unir a `main` equivale a publicar a los teléfonos: hacerlo solo cuando el
 usuario lo pida. Los cambios que no tocan la app (documentación, CI) conviene
 unirlos junto con el siguiente cambio real, para no publicar versiones vacías.
@@ -29,7 +34,7 @@ unirlos junto con el siguiente cambio real, para no publicar versiones vacías.
   `flutter pub get`. No tiene el SDK de Android: el APK solo se compila en la CI.
 - La clave de firma está en los secretos de GitHub (`KEYSTORE_BASE64`,
   `KEYSTORE_PASSWORD`, `KEY_ALIAS`). Sin ella un APK no puede actualizar al
-  instalado, así que los APK de PR no sirven para instalar encima.
+  instalado, así que los APK de PR no sirven para instalar encima; los de prueba sí.
 
 ## Estructura
 
@@ -39,8 +44,8 @@ unirlos junto con el siguiente cambio real, para no publicar versiones vacías.
 - `lib/screens/`: pantallas; `game_screen.dart` es la más grande.
 - `catalog/`: imágenes que la app descarga desde `raw.githubusercontent.com`
   en `main`. Ver `catalog/README.md` para añadir una. Solo dominio público o CC0.
-- `tools/`: scripts de PowerShell para buscar imágenes; solo corren en Windows
-  (pendiente pasarlos a Linux).
+- `tools/fetch_images.py`: descarga imágenes candidatas de Wikimedia Commons
+  o del Met a una carpeta para revisarlas (`--help` muestra el uso).
 
 ## Convenciones
 
